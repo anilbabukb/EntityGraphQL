@@ -51,7 +51,7 @@ type SubscriptionType {
 }
 
 type Movie {
-	id: Int!
+	id: Int
 	name: String
 	"Enum of Genre"
 	genre: Genre!
@@ -62,18 +62,18 @@ type Movie {
 	writers: [Person!]
 	director: Person
 	directorId: Int
-	rating: Float!
+	rating: Float
 }
 
 type Actor {
-	personId: Int!
+	personId: Int
 	person: Person
-	movieId: Int!
+	movieId: Int
 	movie: Movie
 }
 
 type Person {
-	id: Int!
+	id: Int
 	firstName: String
 	lastName: String
 	dob: Date
@@ -91,9 +91,9 @@ type Person {
 }
 
 type Writer {
-	personId: Int!
+	personId: Int
 	person: Person
-	movieId: Int!
+	movieId: Int
 	movie: Movie
 }
 
@@ -112,11 +112,10 @@ input Detail {
 	description: String
 }
 
-
 type Mutation {
 	"Add a new Movie object"
-	addMovie(name: String, rating: Float!, details: [Detail!], genre: Genre!, released: Date): Movie
-	addActor(firstName: String, lastName: String, movieId: Int!): Person
-	addActor2(firstName: String, lastName: String, movieId: Int!): Person
+	addMovie(name: String, rating: Float, details: [Detail!], genre: Genre!, released: Date): Movie
+	addActor(firstName: String, lastName: String, movieId: Int): Person
+	addActor2(firstName: String, lastName: String, movieId: Int): Person
 
 }
