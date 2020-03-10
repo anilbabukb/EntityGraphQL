@@ -337,6 +337,7 @@ namespace EntityGraphQL.Compiler
                 case ">=": return ExpressionType.GreaterThanOrEqual;
                 case "<": return ExpressionType.LessThan;
                 case ">": return ExpressionType.GreaterThan;
+                case "!=": return ExpressionType.NotEqual;
                 default: throw new EntityGraphQLCompilerException($"Unsupported binary operator '{op}'");
             }
         }

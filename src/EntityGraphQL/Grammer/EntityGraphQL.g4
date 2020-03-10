@@ -23,7 +23,7 @@ varArray    : '[' type=identity required='!'? ']';
 gqlTypeDef  : gqlVar ws* ':' ws* (type=identity | arrayType=varArray) required='!'? (ws* '=' ws* defaultValue=constant)?;
 gqlarg      : gqlfield=identity ws* ':' ws* (gqlvalue=expression | gqlvar=gqlVar);
 
-operator    : '-' | '+' | '%' | '^' | 'and' | '*' | 'or' | '=' | '<=' | '>=' | '<' | '>' | '/';
+operator    : '-' | '+' | '%' | '^' | 'and' | '*' | 'or' | '=' | '<=' | '>=' | '<' | '>' | '/' | '!=';
 
 expression  : 'if' ' '* test=expression ' '* 'then' ' '* ifTrue=expression ' '* 'else' ' '* ifFalse=expression #ifThenElse
               | test=expression ' '* '?' ' '* ifTrue=expression ' '* ':' ' '* ifFalse=expression #ifThenElseInline
