@@ -51,9 +51,26 @@ namespace EntityGraphQL.Compiler
                 return ConvertLeftOrRight(op, left, right);
             }
 
-            if (op == ExpressionType.Add && left.Type == typeof(string) && right.Type == typeof(string))
+            if (left.Type == typeof(string) && right.Type == typeof(string))
             {
-                return (ExpressionResult)Expression.Call(null, typeof(string).GetMethod("Concat", new[] { typeof(string), typeof(string) }), left, right);
+                if(op == ExpressionType.Add)
+                    return (ExpressionResult)Expression.Call(null, typeof(string).GetMethod("Concat", new[] { typeof(string), typeof(string) }), left, right);
+
+                if (op == ExpressionType.GreaterThan || op == ExpressionType.GreaterThanOrEqual || op == ExpressionType.LessThan || op == ExpressionType.LessThanOrEqual)
+                {
+                    MethodInfo methodInfo = typeof(string).GetMethod("CompareTo", new[] { typeof(string) });
+                    var callExpr = Expression.Call(left, methodInfo, right);
+                    ExpressionResult searchExpr = null;
+                    if(op == ExpressionType.GreaterThan)
+                        searchExpr = (ExpressionResult)Expression.GreaterThan(callExpr, Expression.Constant(0));
+                    if (op == ExpressionType.GreaterThanOrEqual)
+                        searchExpr = (ExpressionResult)Expression.GreaterThanOrEqual(callExpr, Expression.Constant(0));
+                    if (op == ExpressionType.LessThan)
+                        searchExpr = (ExpressionResult)Expression.LessThan(callExpr, Expression.Constant(0));
+                    if (op == ExpressionType.LessThanOrEqual)
+                        searchExpr = (ExpressionResult)Expression.LessThanOrEqual(callExpr, Expression.Constant(0));
+                    return searchExpr;
+                }
             }
 
             return (ExpressionResult)Expression.MakeBinary(op, left, right);
