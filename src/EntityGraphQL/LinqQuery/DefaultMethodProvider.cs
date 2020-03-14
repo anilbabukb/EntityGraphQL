@@ -48,6 +48,10 @@ namespace EntityGraphQL.LinqQuery
             { "count", MakeCountMethod },
             { "orderby", MakeOrderByMethod },
             { "orderbydesc", MakeOrderByDescMethod },
+            { "startsWith", MakeStartsWithMethod },
+            { "endsWith", MakeEndsWithMethod },
+            { "contains", MakeContainsMethod },
+            { "notContains", MakeNotContainsMethod }
         };
 
         public bool EntityTypeHasMethod(Type context, string methodName)
@@ -110,7 +114,7 @@ namespace EntityGraphQL.LinqQuery
         {
             return MakeOptionalFilterArgumentCall(context, argContext, methodName, args, "Last");
         }
-
+        
         private static ExpressionResult MakeTakeMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
         {
             ExpectArgsCount(1, args, methodName);
@@ -145,6 +149,38 @@ namespace EntityGraphQL.LinqQuery
             var lambda = Expression.Lambda(column, argContext as ParameterExpression);
 
             return ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "OrderByDescending", new Type[] { argContext.Type, column.Type }, context, lambda);
+        }
+        public static ExpressionResult MakeStartsWithMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            ExpectArgsCount(1, args, methodName);
+            var column = args.First();
+            MethodInfo methodInfo = typeof(string).GetMethod("StartsWith", new[] { typeof(string) });
+            return (ExpressionResult)Expression.Call(context, methodInfo, column);            
+        }
+
+        public static ExpressionResult MakeEndsWithMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            ExpectArgsCount(1, args, methodName);
+            var column = args.First();
+            MethodInfo methodInfo = typeof(string).GetMethod("EndsWith", new[] { typeof(string) });
+            return (ExpressionResult)Expression.Call(context, methodInfo, column);
+        }
+
+        public static ExpressionResult MakeContainsMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            ExpectArgsCount(1, args, methodName);
+            var column = args.First();
+            MethodInfo methodInfo = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+            return (ExpressionResult)Expression.Call(context, methodInfo, column);
+        }
+
+        public static ExpressionResult MakeNotContainsMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            ExpectArgsCount(1, args, methodName);
+            var column = args.First();
+            MethodInfo methodInfo = typeof(string).GetMethod("Contains", new[] { typeof(string) });
+            var callExpr = Expression.Call(context, methodInfo, column);
+            return (ExpressionResult)Expression.Not(callExpr);
         }
 
         private static ExpressionResult GetContextFromEnumerable(ExpressionResult context)
