@@ -51,7 +51,8 @@ namespace EntityGraphQL.LinqQuery
             { "startsWith", MakeStartsWithMethod },
             { "endsWith", MakeEndsWithMethod },
             { "contains", MakeContainsMethod },
-            { "notContains", MakeNotContainsMethod }
+            { "notContains", MakeNotContainsMethod },
+            { "distinct", MakeDistinctMethod }
         };
 
         public bool EntityTypeHasMethod(Type context, string methodName)
@@ -114,14 +115,22 @@ namespace EntityGraphQL.LinqQuery
         {
             return MakeOptionalFilterArgumentCall(context, argContext, methodName, args, "Last");
         }
-        
+
+        private static ExpressionResult MakeDistinctMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            //ExpectArgsCount(0, args, methodName);
+            //var result = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Distinct", new Type[] { argContext.Type }, context);
+            //return result;
+            return MakeOptionalFilterArgumentCall(context, argContext, methodName, args, "Distinct");
+        }
+
         private static ExpressionResult MakeTakeMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
         {
             ExpectArgsCount(1, args, methodName);
             var amount = args.First();
             amount = ConvertTypeIfWeCan(methodName, amount, typeof(int));
-
-            return ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Take", new Type[] { argContext.Type }, context, amount);
+            var result = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Take", new Type[] { argContext.Type }, context, amount);
+            return result;
         }
 
         private static ExpressionResult MakeSkipMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)

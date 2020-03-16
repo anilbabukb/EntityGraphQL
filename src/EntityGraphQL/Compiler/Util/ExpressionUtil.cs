@@ -159,5 +159,39 @@ namespace EntityGraphQL.Compiler.Util
             var mi = Expression.MemberInit(newExp, bindings);
             return mi;
         }
+        public static Tuple<Expression, Expression> FindDistinct(ExpressionResult expressionResult)
+        {
+            Expression expr = null;
+            Expression endExpression = null;
+
+            if (expressionResult.Expression is MethodCallExpression methodCallExpression)
+            {
+                var methodInfo = methodCallExpression.Method;
+                var methodName = methodInfo.Name;
+                if (methodName == "Distinct")
+                {
+                    var exp = expressionResult.Expression;
+                    //while (exp != null)
+                    //{
+                    switch (exp.NodeType)
+                    {
+                        case ExpressionType.Call:
+                            {
+                                endExpression = exp;
+                                var mc = (MethodCallExpression)exp;
+                                exp = mc.Object != null ? mc.Object : mc.Arguments.First();
+                                break;
+                            }
+                        default:
+                            //exp = null;
+                            break;
+                    }
+                    //}
+                    expr = exp;
+                }
+            }
+
+            return Tuple.Create(expr, endExpression);
+        }
     }
 }
