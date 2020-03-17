@@ -22,7 +22,7 @@ namespace EntityGraphQL.Compiler
         private readonly IMethodProvider methodProvider;
         private readonly QueryVariables variables;
         private IMethodType fieldArgumentContext;
-        private readonly Regex guidRegex = new Regex(@"^[0-9A-F]{8}[-]?([0-9A-F]{4}[-]?){3}[0-9A-F]{12}$", RegexOptions.IgnoreCase);
+        private readonly Regex guidRegex = new Regex(@"^[0-9A-F]{8}[-]?([0-9A-F]{4}[-]?){3}[0-9A-F]{12}$", RegexOptions.IgnoreCase);        
 
         public QueryGrammerNodeVisitor(Expression expression, ISchemaProvider schemaProvider, IMethodProvider methodProvider, QueryVariables variables, ClaimsIdentity claims)
         {
@@ -99,6 +99,11 @@ namespace EntityGraphQL.Compiler
         private static ExpressionResult ConvertToGuid(ExpressionResult expression)
         {
             return (ExpressionResult)Expression.Call(typeof(Guid), "Parse", null, (ExpressionResult)Expression.Call(expression, typeof(object).GetMethod("ToString")));
+        }
+
+        private static ExpressionResult ConvertToDate(ExpressionResult expression)
+        {
+            return (ExpressionResult)Expression.Call(typeof(DateTime), "Parse", null, (ExpressionResult)Expression.Call(expression, typeof(object).GetMethod("ToString")));
         }
 
         public override ExpressionResult VisitExpr(EntityGraphQLParser.ExprContext context)
@@ -267,7 +272,22 @@ namespace EntityGraphQL.Compiler
             var exp = (ExpressionResult)Expression.Constant(value);
             if (guidRegex.IsMatch(value))
                 exp = ConvertToGuid(exp);
+            if (IsValidDate(value))
+                exp = ConvertToDate(exp);
             return exp;
+        }
+
+        bool IsValidDate(string text)
+        {
+            try
+            {
+                DateTime.Parse(text);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public override ExpressionResult VisitNull(EntityGraphQLParser.NullContext context)
