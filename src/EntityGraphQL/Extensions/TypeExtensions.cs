@@ -104,5 +104,10 @@ namespace EntityGraphQL.Extensions
         {
             return t.GetTypeInfo().IsGenericType && t.GetGenericTypeDefinition() == typeof(Nullable<>);
         }
+
+        public static bool IsEnum(this Type t)
+        {
+            return t.GetTypeInfo().IsEnum;
+        }
     }
 }

@@ -343,10 +343,23 @@ namespace EntityGraphQL.Compiler
             else if (right.Type.IsNullableType() && !left.Type.IsNullableType())
                 left = (ExpressionResult)Expression.Convert(left, right.Type);
 
-            else if (left.Type == typeof(int) && (right.Type == typeof(uint) || right.Type == typeof(Int16) || right.Type == typeof(Int64) || right.Type == typeof(UInt16) || right.Type == typeof(UInt64) ))
+            else if (left.Type == typeof(int) && (right.Type == typeof(uint) || right.Type == typeof(Int16) || right.Type == typeof(Int64) || right.Type == typeof(UInt16) || right.Type == typeof(UInt64)))
                 right = (ExpressionResult)Expression.Convert(right, left.Type);
-            else if (left.Type == typeof(uint) && (right.Type == typeof(int) || right.Type == typeof(Int16) || right.Type == typeof(Int64) || right.Type == typeof(UInt16) || right.Type == typeof(UInt64) ))
-                left = (ExpressionResult)Expression.Convert(left, right.Type);
+            else if (left.Type == typeof(uint) && (right.Type == typeof(int) || right.Type == typeof(Int16) || right.Type == typeof(Int64) || right.Type == typeof(UInt16) || right.Type == typeof(UInt64)))
+                left = (ExpressionResult)Expression.Convert(left, right.Type);            
+            else if(left.Type.IsEnum() && (right.Type == typeof(uint) || right.Type == typeof(Int16) || right.Type == typeof(Int64) || right.Type == typeof(UInt16) || right.Type == typeof(UInt64)))
+                right = (ExpressionResult)Expression.Convert(right, left.Type);
+            else if(left.Type.IsEnum() && right.Type == typeof(string))
+            {
+                string val = Expression.Lambda<Func<String>>(right.Expression).Compile()();
+                Type enumType = left.Type;
+                object t = Enum.Parse(enumType, val);
+                if (t != null)
+                {
+                    right = new ExpressionResult(Expression.Constant((int)t,typeof(int)));                    
+                    right = (ExpressionResult)Expression.Convert(right, left.Type);
+                }                    
+            }
 
             return (ExpressionResult)Expression.MakeBinary(op, left, right);
         }
