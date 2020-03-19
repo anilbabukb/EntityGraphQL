@@ -52,7 +52,9 @@ namespace EntityGraphQL.LinqQuery
             { "endsWith", MakeEndsWithMethod },
             { "contains", MakeContainsMethod },
             { "notContains", MakeNotContainsMethod },
-            { "distinct", MakeDistinctMethod }
+            { "distinct", MakeDistinctMethod },
+            { "not", MakeNotMethod }
+
         };
 
         public bool EntityTypeHasMethod(Type context, string methodName)
@@ -190,6 +192,13 @@ namespace EntityGraphQL.LinqQuery
             MethodInfo methodInfo = typeof(string).GetMethod("Contains", new[] { typeof(string) });
             var callExpr = Expression.Call(context, methodInfo, column);
             return (ExpressionResult)Expression.Not(callExpr);
+        }
+
+        public static ExpressionResult MakeNotMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            ExpectArgsCount(1, args, methodName);
+            var column = args.First();
+            return (ExpressionResult)Expression.Not(column);
         }
 
         private static ExpressionResult GetContextFromEnumerable(ExpressionResult context)
