@@ -16,6 +16,32 @@ namespace EntityGraphQL.LinqQuery.Tests
             var result = exp.Execute(new TestSchema()) as Person;
             Assert.Equal(new Guid("6492f5fe-0869-4279-88df-7f82f8e87a67"), result.Guid);
         }
+
+        [Fact]
+        public void CompilesOrderBy()
+        {
+            var exp = EqlCompiler.Compile(@"people.orderBy(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Equal(4, result.Count());
+            Assert.Equal("Bob", result.ElementAt(0).Name);
+            Assert.Equal("Boba", result.ElementAt(1).Name);
+            Assert.Equal("Luke", result.ElementAt(2).Name);
+            Assert.Equal("Robin", result.ElementAt(3).Name);
+        }
+
+        [Fact]
+        public void CompilesOrderByDesc()
+        {
+            var exp = EqlCompiler.Compile(@"people.orderByDesc(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Equal(4, result.Count());
+            Assert.Equal("Robin", result.ElementAt(0).Name);
+            Assert.Equal("Luke", result.ElementAt(1).Name);
+            Assert.Equal("Boba", result.ElementAt(2).Name);
+            Assert.Equal("Bob", result.ElementAt(3).Name);
+        }
+        
+
         [Fact]
         public void CompilesWhere()
         {
@@ -23,6 +49,7 @@ namespace EntityGraphQL.LinqQuery.Tests
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Empty(result);
         }
+
         [Fact]
         public void CompilesWhere2()
         {
@@ -30,6 +57,54 @@ namespace EntityGraphQL.LinqQuery.Tests
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Single(result);
         }
+
+        [Fact]
+        public void CompilesWhereForStringStartsWith()
+        {
+            var exp = EqlCompiler.Compile(@"people.where(name.startsWith(""L""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Single(result);
+            Assert.Equal("Luke", result.ElementAt(0).Name);
+        }
+
+        [Fact]
+        public void CompilesWhereForStringEndsWith()
+        {
+            var exp = EqlCompiler.Compile(@"people.where(name.endsWith(""n""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Single(result);
+            Assert.Equal("Robin", result.ElementAt(0).Name);
+        }
+
+        [Fact]
+        public void CompilesWhereForStringContains()
+        {
+            var exp = EqlCompiler.Compile(@"people.where(name.contains(""b""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Equal(3, result.Count());
+            Assert.Equal("Bob", result.ElementAt(0).Name);
+            Assert.Equal("Boba", result.ElementAt(1).Name);
+            Assert.Equal("Robin", result.ElementAt(2).Name);
+        }
+
+        [Fact]
+        public void CompilesWhereForStringNotContains()
+        {
+            var exp = EqlCompiler.Compile(@"people.where(name.notContains(""b""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Single(result);
+            Assert.Equal("Luke", result.ElementAt(0).Name);
+        }
+
+        [Fact]
+        public void CompilesWhereForNot()
+        {
+            var exp = EqlCompiler.Compile(@"people.where(not(name.contains(""b"")))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
+            Assert.Single(result);
+            Assert.Equal("Luke", result.ElementAt(0).Name);
+        }
+
         [Fact]
         public void FailsWhereNoParameter()
         {
@@ -42,7 +117,7 @@ namespace EntityGraphQL.LinqQuery.Tests
             var ex = Assert.Throws<EntityGraphQLCompilerException>(() => EqlCompiler.Compile("people.where(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null));
             Assert.Equal("Method 'where' expects parameter that evaluates to a 'System.Boolean' result but found result type 'System.String'", ex.Message);
         }
-
+       
         [Fact]
         public void CompilesFirstWithPredicate()
         {

@@ -119,10 +119,7 @@ namespace EntityGraphQL.LinqQuery
         }
 
         private static ExpressionResult MakeDistinctMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
-        {
-            //ExpectArgsCount(0, args, methodName);
-            //var result = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Distinct", new Type[] { argContext.Type }, context);
-            //return result;
+        {            
             return MakeOptionalFilterArgumentCall(context, argContext, methodName, args, "Distinct");
         }
 

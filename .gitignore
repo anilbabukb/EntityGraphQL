@@ -14,3 +14,8 @@ obj/
 .vs/
 
 node_modules/
+/.cr/personal/Unit Testing/Continuous Testing.xml
+/_NCrunch_EntityGraphQL/EntityGraphQL.executiontimes.cache
+/_NCrunch_EntityGraphQL/EntityGraphQL.crunchsolution.cache
+/src/tests/EntityGraphQL.Tests/EntityGraphQL.Tests.v3.ncrunchproject
+/EntityGraphQL.v3.ncrunchsolution

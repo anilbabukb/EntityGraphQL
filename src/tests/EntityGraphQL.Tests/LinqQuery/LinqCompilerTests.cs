@@ -96,6 +96,83 @@ namespace EntityGraphQL.LinqQuery.Tests
         }
 
         [Fact]
+        public void CompilesBinaryExpressionEqualsAgainstString()
+        {
+            var exp = EqlCompiler.Compile("someRelation.name = \"bob\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionNotEquals()
+        {
+            var exp = EqlCompiler.Compile("someRelation.relation.id != 100", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionNotEqualsAgainstString()
+        {
+            var exp = EqlCompiler.Compile("someRelation.name != \"tim\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionGreaterThan()
+        {
+            var exp = EqlCompiler.Compile("someRelation.relation.id > 98", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionGreaterThanAgainstString()
+        {
+            var exp = EqlCompiler.Compile("someRelation.name > \"b\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionGreaterThanOrEqualTo()
+        {
+            var exp = EqlCompiler.Compile("someRelation.relation.id >= 98", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionGreaterThanOrEqualToAgainstString()
+        {
+            var exp = EqlCompiler.Compile("someRelation.name >= \"b\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionLessThan()
+        {
+            var exp = EqlCompiler.Compile("someRelation.relation.id < 100", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionLessThanAgainstString()
+        {
+            var exp = EqlCompiler.Compile("someRelation.name < \"c\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionLessThanOrEqualTo()
+        {
+            var exp = EqlCompiler.Compile("someRelation.relation.id <= 100", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
+        public void CompilesBinaryExpressionLessThanOrEqualToAgainstString()
+        {
+            var exp = EqlCompiler.Compile("someRelation.name <= \"c\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            Assert.True((bool)exp.Execute(new TestSchema()));
+        }
+
+        [Fact]
         public void CompilesBinaryExpressionPlus()
         {
             var exp = EqlCompiler.Compile("someRelation.relation.id + 99", SchemaBuilder.FromObject<TestSchema>(), null);
@@ -196,6 +273,35 @@ namespace EntityGraphQL.LinqQuery.Tests
             Assert.Equal(2, results.Count());
             Assert.Equal("bob", results.ElementAt(0).Name);
             Assert.Equal("mary", results.ElementAt(1).Name);
+        }
+
+        [Fact]
+        public void TestLinqQueryWorksForAnd()
+        {
+            var schemaProvider = SchemaBuilder.FromObject<TestEntity>();
+            var compiledResult = EqlCompiler.Compile("(relation.id = 1) and (name = \"bob\")", schemaProvider, null);
+            var list = new List<TestEntity> {
+                new TestEntity("bob") {
+                    Relation = new Person {
+                        Id = 1
+                    }
+                },
+                new TestEntity("mary") {
+                    Relation = new Person {
+                        Id = 2
+                    }
+                },
+                new TestEntity("Jake") {
+                    Relation = new Person {
+                        Id = 5
+                    }
+                }
+            };
+            Assert.Equal(3, list.Count());
+            var results = list.Where((Func<TestEntity, bool>)compiledResult.LambdaExpression.Compile());
+
+            Assert.Single(results);
+            Assert.Equal("bob", results.ElementAt(0).Name);
         }
 
         // This would be your Entity/Object graph you use with EntityFramework
