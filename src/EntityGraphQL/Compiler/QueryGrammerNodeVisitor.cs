@@ -144,7 +144,8 @@ namespace EntityGraphQL.Compiler
             var fieldName = context.method.GetText();
             var argList = context.gqlarguments.children.Where(c => c.GetType() == typeof(EntityGraphQLParser.GqlargContext)).Cast<EntityGraphQLParser.GqlargContext>();
             IMethodType methodType = schemaProvider.GetFieldOnContext(currentContext, fieldName, claims);
-            var args = argList.ToDictionary(a => a.gqlfield.GetText(), a => {
+            var args = argList.ToDictionary(a => a.gqlfield.GetText(), a =>
+            {
                 var argName = a.gqlfield.GetText();
                 if (!methodType.Arguments.ContainsKey(argName))
                 {
@@ -189,7 +190,7 @@ namespace EntityGraphQL.Compiler
                         (argType.Type == typeof(Guid) || argType.Type == typeof(Guid?) ||
                         argType.Type == typeof(RequiredField<Guid>) || argType.Type == typeof(RequiredField<Guid?>)) && guidRegex.IsMatch(strValue))
                     {
-                        return ConvertToGuid(gqlVarValue);
+                        return (ExpressionResult)Expression.Constant(Guid.Parse(strValue));
                     }
                     if (argType.Type.IsConstructedGenericType && argType.Type.GetGenericTypeDefinition() == typeof(EntityQueryType<>))
                     {
@@ -198,7 +199,7 @@ namespace EntityGraphQL.Compiler
                         {
                             query = query.Substring(1, context.gqlvalue.GetText().Length - 2);
                         }
-                        return BuildEntityQueryExpression(query);
+                        return BuildEntityQueryExpression(fieldArgumentContext.Name, argName, query);
                     }
 
                     var argumentNonNullType = argType.Type.IsNullableType() ? Nullable.GetUnderlyingType(argType.Type) : argType.Type;
@@ -218,15 +219,18 @@ namespace EntityGraphQL.Compiler
             return gqlVarValue;
         }
 
-        private ExpressionResult BuildEntityQueryExpression(string query)
+        private ExpressionResult BuildEntityQueryExpression(string fieldName, string argName, string query)
         {
-            var prop = ((Schema.Field)fieldArgumentContext).ArgumentTypesObject.GetType().GetProperties().FirstOrDefault(p => p.PropertyType.GetGenericTypeDefinition() == typeof(EntityQueryType<>));
-            var eqlt = prop.GetValue(((Schema.Field)fieldArgumentContext).ArgumentTypesObject) as BaseEntityQueryType;
-            var contextParam = Expression.Parameter(eqlt.QueryType);
             if (string.IsNullOrEmpty(query))
             {
                 return null;
             }
+            var prop = ((Field)fieldArgumentContext).ArgumentTypesObject.GetType().GetProperties().FirstOrDefault(p => p.Name == argName && p.PropertyType.GetGenericTypeDefinition() == typeof(EntityQueryType<>));
+            if (prop == null)
+                throw new EntityGraphQLCompilerException($"Can not find argument {argName} of type EntityQuery on field {fieldName}");
+
+            var eqlt = prop.GetValue(((Field)fieldArgumentContext).ArgumentTypesObject) as BaseEntityQueryType;
+            var contextParam = Expression.Parameter(eqlt.QueryType);
             ExpressionResult expressionResult = EqlCompiler.CompileWith(query, contextParam, schemaProvider, claims, methodProvider, variables).ExpressionResult;
             expressionResult = (ExpressionResult)Expression.Lambda(expressionResult.Expression, contextParam);
             return expressionResult;
@@ -269,12 +273,11 @@ namespace EntityGraphQL.Compiler
         {
             // we may need to convert a string into a DateTime or Guid type
             string value = context.GetText().Substring(1, context.GetText().Length - 2).Replace("\\\"", "\"");
-            var exp = (ExpressionResult)Expression.Constant(value);
             if (guidRegex.IsMatch(value))
-                exp = ConvertToGuid(exp);
+                return (ExpressionResult)Expression.Constant(Guid.Parse(value));
             if (IsValidDate(value))
-                exp = ConvertToDate(exp);
-            return exp;
+                return (ExpressionResult)Expression.Constant(DateTime.Parse(value));
+            return (ExpressionResult)Expression.Constant(value);
         }
 
         bool IsValidDate(string text)
