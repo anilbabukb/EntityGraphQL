@@ -53,7 +53,8 @@ namespace EntityGraphQL.LinqQuery
             { "contains", MakeContainsMethod },
             { "notContains", MakeNotContainsMethod },
             { "distinct", MakeDistinctMethod },
-            { "not", MakeNotMethod }
+            { "not", MakeNotMethod },
+            { "in", MakeInMethod }
 
         };
 
@@ -139,6 +140,25 @@ namespace EntityGraphQL.LinqQuery
             amount = ConvertTypeIfWeCan(methodName, amount, typeof(int));
 
             return ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Skip", new Type[] { argContext.Type }, context, amount);
+        }
+
+        private static ExpressionResult MakeInMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        {
+            if(argContext.Type == typeof(string))
+            {
+                var values = args.Where(i => i != null).Select(i =>((ConstantExpression)i.Expression).Value.ToString()).ToList();
+                MethodInfo methodInfo = typeof(List<string>).GetMethod("Contains");
+                var exp = (ExpressionResult)Expression.Call(Expression.Constant(values), methodInfo, argContext);
+                return exp;
+            }
+            else if(argContext.Type == typeof(int))
+            {
+                var values = args.Where(i => i != null).Select(i => Convert.ToInt32(((ConstantExpression)i.Expression).Value)).ToList();
+                MethodInfo methodInfo = typeof(List<Int32>).GetMethod("Contains");
+                var exp = (ExpressionResult)Expression.Call(Expression.Constant(values), methodInfo, argContext);
+                return exp;
+            }
+            throw new InvalidCastException();
         }
 
         private static ExpressionResult MakeOrderByMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
