@@ -1,4 +1,46 @@
+# 0.63.0
+- Expose a `SchemaProvider.ExecuteQueryAsync()`
+- Fix #53 support mutations with no arguments
+- With the above fix the context and/or the mutation arguments parameters are optional in your mutation method
+- the parameters in the mutation methods are no longer required to follow a position
+- `SchemaProvider.AddCustomScalarType()` is deprecated, use `AddScalarType`
+- Directvies are now included in schema introspection
+- Fix #52 - sometimes incorrect types generated for schema intropection or the GraphQL schema file format
+- Refactor type information held in the schema. This mean return types etc are evaluated at schema creation time not execution. If you add a field that requires a type as an Arg ument or return type, that type must already be in the schema
+- You can now provide a field namer function to name the generated fields when using `SchemaBuilder.FromObject()`, `ISchemaType.AddAllFields()` or `SchemaProvider.PopulateFromContext()`
+
+*Breaking changes*
+- The class that represents the mutation arguments must be marked with the `MutationArgumentsAttribute` either at the class level or the parameter
+- `SchemaProvider` now adds a default `Date` scalar type in the schema that maps to/from the C# `DateTime` class. If you were previously adding that you'll get an error on type existing. Use `SchemaProvider.RemoveType<DateTime>()` to remove it and add it with a different name
+- Type mapping information (`AddTypeMapping()`) are evaluated at schema creation time. You may need to add mappings before creating the rest of your schema
+
+## 0.63.0-beta1 to 0.63.0-beta2
+- Removed the empty `IMutationArguments` in favor for a `MutationArgumentsAttribute` on the parameter or the class
+
+# 0.62.0
+- Support async mutation methods
+
+# 0.61.0
+- Add model validation for mutation arguments. See updated readme
+- Fix issue with services not correctly being included when the field is used in a fragment
+
+# 0.60.0
+- Add support for directives. Supported by default are `@include(if: Boolean!)` and `@skip(if: Boolean!)`. You can add your own that make changes to the expression pre-execution
+- Added syntax support for subscription queries (they compile/no error but do not execute or work)
+- Removed support for older syntax of complex queries that is not GQL standard
+- Refactored `GraphQLVistor` and friends to make it easier to follow what is happening (I hope). See CONTRIBUTING.md for some notes
+- From my testing the compiling and expression building is 15-20% faster than before (still network and or the DB calls are the largest)
+- Allow `enum` values in the query schema (e.g. as an argument)
+- Ignore static properties & fields on the object passed to `SchemaBuilder.FromObject` - they were not supported and threw errors anyway
+
+# 0.50.1
+- Name all `ParameterExpression`s as EF 3.1 expects a name (can throw an error)
+
 # 0.50.0
+- Fix claims check when required claims are empty
+- Fix error message state which claims are required for the given access error
+
+# 0.50.0-beta1
 - Sorry about the quick turn around
 - Breaking changes
   - Using DI inspired design now instead of the `TArg`

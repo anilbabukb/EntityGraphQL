@@ -2,6 +2,8 @@
 // Built using quicktype
 // https://app.quicktype.io/#l=cs&r=json2csharp
 //
+using System.Collections.Generic;
+
 namespace EntityGraphQL.Schema.Models
 {
     public partial class Schema
@@ -12,9 +14,9 @@ namespace EntityGraphQL.Schema.Models
 
         public SubscriptionType SubscriptionType { get; set; }
 
-        public TypeElement[] Types { get; set; }
+        public List<TypeElement> Types { get; set; }
 
-        public Directives[] Directives { get; set; }
+        public List<Directive> Directives { get; set; }
     }
 
     public partial class SubscriptionType
@@ -26,10 +28,10 @@ namespace EntityGraphQL.Schema.Models
     {
         public TypeElement()
         {
-            EnumValues = new Models.EnumValue[] {};
-            Interfaces = new TypeElement[] {};
-            PossibleTypes = new TypeElement[] {};
-            InputFields = new InputValue[] {};
+            EnumValues = new Models.EnumValue[] { };
+            Interfaces = new TypeElement[] { };
+            PossibleTypes = new TypeElement[] { };
+            InputFields = new InputValue[] { };
         }
 
         public string Kind { get; set; }
@@ -73,7 +75,7 @@ namespace EntityGraphQL.Schema.Models
         public string DefaultValue { get; set; }
     }
 
-    public partial class Directives
+    public partial class Directive
     {
         public string Name { get; set; }
 

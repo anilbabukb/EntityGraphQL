@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -26,6 +24,8 @@ namespace demo
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<DemoContext>(opt => opt.UseSqlite("Filename=demo.db"));
+
+            services.AddSingleton<AgeService>();
 
             // add schema provider so we don't need to create it everytime
             services.AddSingleton(GraphQLSchema.MakeSchema());            

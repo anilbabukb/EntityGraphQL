@@ -4,17 +4,14 @@ using System.Linq.Expressions;
 using System.Reflection;
 using EntityGraphQL.Grammer;
 using EntityGraphQL.Extensions;
-using System.Collections.Generic;
 using EntityGraphQL.Schema;
-using System.Text.RegularExpressions;
 using EntityGraphQL.LinqQuery;
-using System.Globalization;
 using System.Security.Claims;
 
 namespace EntityGraphQL.Compiler
 {
 
-    internal class QueryGrammerNodeVisitor : EntityGraphQLBaseVisitor<ExpressionResult>
+    internal class EntityQueryNodeVisitor : EntityGraphQLBaseVisitor<ExpressionResult>
     {
         private readonly ClaimsIdentity claims;
         private ExpressionResult currentContext;
@@ -23,14 +20,15 @@ namespace EntityGraphQL.Compiler
         private readonly QueryVariables variables;
         private IMethodType fieldArgumentContext;
         private readonly Regex guidRegex = new Regex(@"^[0-9A-F]{8}[-]?([0-9A-F]{4}[-]?){3}[0-9A-F]{12}$", RegexOptions.IgnoreCase);        
+        private readonly ConstantVisitor constantVisitor;
 
-        public QueryGrammerNodeVisitor(Expression expression, ISchemaProvider schemaProvider, IMethodProvider methodProvider, QueryVariables variables, ClaimsIdentity claims)
+        public EntityQueryNodeVisitor(Expression expression, ISchemaProvider schemaProvider, IMethodProvider methodProvider, QueryVariables variables, ClaimsIdentity claims)
         {
             this.claims = claims;
             currentContext = (ExpressionResult)expression;
             this.schemaProvider = schemaProvider;
             this.methodProvider = methodProvider;
-            this.variables = variables;
+            this.constantVisitor = new ConstantVisitor(schemaProvider);
         }
 
         public override ExpressionResult VisitBinary(EntityGraphQLParser.BinaryContext context)
@@ -137,140 +135,17 @@ namespace EntityGraphQL.Compiler
         public override ExpressionResult VisitIdentity(EntityGraphQLParser.IdentityContext context)
         {
             var field = context.GetText();
-            return MakeFieldExpression(field, null);
-        }
-
-        public override ExpressionResult VisitGqlcall(EntityGraphQLParser.GqlcallContext context)
-        {
-            var fieldName = context.method.GetText();
-            var argList = context.gqlarguments.children.Where(c => c.GetType() == typeof(EntityGraphQLParser.GqlargContext)).Cast<EntityGraphQLParser.GqlargContext>();
-            IMethodType methodType = schemaProvider.GetFieldOnContext(currentContext, fieldName, claims);
-            var args = argList.ToDictionary(a => a.gqlfield.GetText(), a =>
+            string name = schemaProvider.GetSchemaTypeNameForDotnetType(currentContext.Type);
+            if (!schemaProvider.TypeHasField(name, field, null, claims))
             {
-                var argName = a.gqlfield.GetText();
-                if (!methodType.Arguments.ContainsKey(argName))
-                {
-                    throw new EntityGraphQLCompilerException($"No argument '{argName}' found on field '{methodType.Name}'");
-                }
-                fieldArgumentContext = methodType;
-                var r = VisitGqlarg(a);
-                fieldArgumentContext = null;
-                return r;
-            });
-            if (schemaProvider.HasMutation(fieldName))
-            {
-                return MakeMutationExpression((MutationType)methodType, args);
+                throw new EntityGraphQLCompilerException($"Field {field} not found on type {name}");
             }
-            return MakeFieldExpression(fieldName, args);
-        }
-
-        public override ExpressionResult VisitGqlarg(EntityGraphQLParser.GqlargContext context)
-        {
-            ExpressionResult gqlVarValue = null;
-            if (context.gqlVar() != null)
-            {
-                string varKey = context.gqlVar().GetText().TrimStart('$');
-                object value = variables.GetValueFor(varKey);
-                gqlVarValue = (ExpressionResult)Expression.Constant(value);
-            }
-            else
-            {
-                gqlVarValue = Visit(context.gqlvalue);
-            }
-
-
-            string argName = context.gqlfield.GetText();
-            if (fieldArgumentContext.HasArgumentByName(argName))
-            {
-                var argType = fieldArgumentContext.GetArgumentType(argName);
-
-                if (gqlVarValue != null && gqlVarValue.Type == typeof(string) && gqlVarValue.NodeType == ExpressionType.Constant)
-                {
-                    string strValue = (string)((ConstantExpression)gqlVarValue).Value;
-                    if (
-                        (argType.Type == typeof(Guid) || argType.Type == typeof(Guid?) ||
-                        argType.Type == typeof(RequiredField<Guid>) || argType.Type == typeof(RequiredField<Guid?>)) && guidRegex.IsMatch(strValue))
-                    {
-                        return (ExpressionResult)Expression.Constant(Guid.Parse(strValue));
-                    }
-                    if (argType.Type.IsConstructedGenericType && argType.Type.GetGenericTypeDefinition() == typeof(EntityQueryType<>))
-                    {
-                        string query = strValue;
-                        if (query.StartsWith("\""))
-                        {
-                            query = query.Substring(1, context.gqlvalue.GetText().Length - 2);
-                        }
-                        return BuildEntityQueryExpression(fieldArgumentContext.Name, argName, query);
-                    }
-
-                    var argumentNonNullType = argType.Type.IsNullableType() ? Nullable.GetUnderlyingType(argType.Type) : argType.Type;
-                    if (argumentNonNullType.GetTypeInfo().IsEnum)
-                    {
-                        var enumName = strValue;
-                        var valueIndex = Enum.GetNames(argumentNonNullType).ToList().FindIndex(n => n == enumName);
-                        if (valueIndex == -1)
-                        {
-                            throw new EntityGraphQLCompilerException($"Value {enumName} is not valid for argument {context.gqlfield.GetText()}");
-                        }
-                        var enumValue = Enum.GetValues(argumentNonNullType).GetValue(valueIndex);
-                        return (ExpressionResult)Expression.Constant(enumValue);
-                    }
-                }
-            }
-            return gqlVarValue;
-        }
-
-        private ExpressionResult BuildEntityQueryExpression(string fieldName, string argName, string query)
-        {
-            if (string.IsNullOrEmpty(query))
-            {
-                return null;
-            }
-            var prop = ((Field)fieldArgumentContext).ArgumentTypesObject.GetType().GetProperties().FirstOrDefault(p => p.Name == argName && p.PropertyType.GetGenericTypeDefinition() == typeof(EntityQueryType<>));
-            if (prop == null)
-                throw new EntityGraphQLCompilerException($"Can not find argument {argName} of type EntityQuery on field {fieldName}");
-
-            var eqlt = prop.GetValue(((Field)fieldArgumentContext).ArgumentTypesObject) as BaseEntityQueryType;
-            var contextParam = Expression.Parameter(eqlt.QueryType);
-            ExpressionResult expressionResult = EqlCompiler.CompileWith(query, contextParam, schemaProvider, claims, methodProvider, variables).ExpressionResult;
-            expressionResult = (ExpressionResult)Expression.Lambda(expressionResult.Expression, contextParam);
-            return expressionResult;
-        }
-
-        private ExpressionResult MakeFieldExpression(string field, Dictionary<string, ExpressionResult> args)
-        {
-            string name = schemaProvider.GetSchemaTypeNameForClrType(currentContext.Type);
-            if (!schemaProvider.TypeHasField(name, field, args != null ? args.Select(d => d.Key) : new string[0], claims))
-            {
-                throw new EntityGraphQLCompilerException($"Field '{field}' not found on current context '{name}'");
-            }
-            var exp = schemaProvider.GetExpressionForField(currentContext, name, field, args, claims);
+            var exp = schemaProvider.GetExpressionForField(currentContext, name, field, null, claims);
             return exp;
+
         }
 
-        private ExpressionResult MakeMutationExpression(MutationType mutationType, Dictionary<string, ExpressionResult> args)
-        {
-            return new MutationResult(mutationType, args);
-        }
-
-        public override ExpressionResult VisitInt(EntityGraphQLParser.IntContext context)
-        {
-            string s = context.GetText();
-            return (ExpressionResult)(s.StartsWith("-") ? Expression.Constant(Int64.Parse(s)) : Expression.Constant(UInt64.Parse(s)));
-        }
-
-        public override ExpressionResult VisitBoolean(EntityGraphQLParser.BooleanContext context)
-        {
-            string s = context.GetText();
-            return (ExpressionResult)Expression.Constant(bool.Parse(s));
-        }
-
-        public override ExpressionResult VisitDecimal(EntityGraphQLParser.DecimalContext context)
-        {
-            return (ExpressionResult)Expression.Constant(Decimal.Parse(context.GetText(), CultureInfo.InvariantCulture));
-        }
-
-        public override ExpressionResult VisitString(EntityGraphQLParser.StringContext context)
+        public override ExpressionResult VisitConstant(EntityGraphQLParser.ConstantContext context)
         {
             // we may need to convert a string into a DateTime or Guid type
             string value = context.GetText().Substring(1, context.GetText().Length - 2).Replace("\\\"", "\"");
@@ -294,12 +169,6 @@ namespace EntityGraphQL.Compiler
             }
         }
 
-        public override ExpressionResult VisitNull(EntityGraphQLParser.NullContext context)
-        {
-            // we may need to convert a string into a DateTime or Guid type
-            var exp = (ExpressionResult)Expression.Constant(null);
-            return exp;
-        }
 
         public override ExpressionResult VisitIfThenElse(EntityGraphQLParser.IfThenElseContext context)
         {

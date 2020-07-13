@@ -12,6 +12,8 @@ If you're looking for a dotnet library to generate code to query an API from a G
 ## Install
 Via Nuget https://www.nuget.org/packages/EntityGraphQL
 
+It recommended to use Newtonsoft.Json when using using .NET Core 3.1+ due to problems with the serialization: [Nuget](https://www.nuget.org/packages/Microsoft.AspNetCore.Mvc.NewtonsoftJson)
+
 # Getting up and running with EF
 
 _Note: There is no dependency on EF. Queries are compiled to `IQueryable` or `IEnumberable` linq expressions. EF is not a requirement - any ORM working with `LinqProvider` or an in-memory object should work - although EF well is tested._
@@ -20,6 +22,10 @@ _Note: There is no dependency on EF. Queries are compiled to `IQueryable` or `IE
 
 ```csharp
 public class MyDbContext : DbContext {
+  public MyDbContext(DbContextOptions options) : base(options)
+  {
+  }
+
   protected override void OnModelCreating(ModelBuilder builder) {
     // Set up your relations
   }
@@ -49,12 +55,13 @@ public class Location {
 ```
 ## 2. Create a route
 
-Using what ever API library you wish. Here is an example for a ASP.NET Core WebApi controller
+Using what ever API library you wish. Here is an example for a ASP.NET Core WebApi controller.
 
 ```csharp
 public class Startup {
   public void ConfigureServices(IServiceCollection services)
   {
+      services.AddControllers().AddNewtonsoftJson();
       services.AddDbContext<MyDbContext>(opt => opt.UseInMemoryDatabase());
       // add schema provider so we don't need to create it everytime
       // Also for this demo we expose all fields on MyDbContext. See below for details on building custom fields etc.
@@ -66,9 +73,9 @@ public class Startup {
 public class QueryController : Controller
 {
     private readonly MyDbContext _dbContext;
-    private readonly MappedSchemaProvider<MyDbContext> _schemaProvider;
+    private readonly SchemaProvider<MyDbContext> _schemaProvider;
 
-    public QueryController(MyDbContext dbContext, MappedSchemaProvider<MyDbContext> schemaProvider)
+    public QueryController(MyDbContext dbContext, SchemaProvider<MyDbContext> schemaProvider)
     {
         this._dbContext = dbContext;
         this._schemaProvider = schemaProvider;
@@ -79,9 +86,9 @@ public class QueryController : Controller
     {
         try
         {
-            var results = _schemaProvider.ExecuteQuery(query, _dbContext null, null);
+            var results = _schemaProvider.ExecuteQuery(query, _dbContext, null, null);
             // gql compile errors show up in results.Errors
-            return results
+            return results;
         }
         catch (Exception)
         {
@@ -190,7 +197,6 @@ Will return the following result.
 - Aliases (`{ cheapProperties: properties(maxCost: 100) { id name } }`)
 - Arguments
   - Add fields that take required or optional arguments to fullfill the query
-  - By default `SchemaBuilder.FromObject<TType>()` generates a non-pural field for any type with a public `Id` property, with the argument name of `id`. E.g. A field `people` that returns a `IEnumerable<Person>` will create a `person(id)` graphql field so you can query `{ person(id: 1234) { name email } }` to select a single person
   - See `schemaProvider.AddField("name", paramTypes, selectionExpression, "description");` in "Customizing the schema" below for more on custom fields
 - Mutations - see `AddMutationFrom<TType>(TType mutationClassInstance)` and details below under Mutation
 - Schema introspection
@@ -198,10 +204,61 @@ Will return the following result.
 
 # Customizing the schema
 
-You can customise the default schema, or create one from stratch exposing only the fields you want.
+When you start your schema with `SchemaBuilder.FromObject<T>()` this only generates fields for public properties in that object graph. The one "smart" thing it does is to add an extra field for any root level property that is of type `IEnumerable<T>` where `T` has a property name `Id`. The extra field is a field that takes an id argument.
+
+Example, given the following context
+
+```c#
+public class MyContext
+{
+    public List<Property> Properties { get; set; }
+}
+public class Property
+{
+    public uint Id { get; set; }
+    public string Name { get; set; }
+    public PropertyType Type { get; set; }
+    public Location Location { get; set; }
+}
+```
+
+If you use `SchemaBuilder.FromObject<MyContext>()` it will generate 2 fields at the root which you can query.
+
+```gql
+{
+    # field auto generated - return a list of properties
+    properties { id name }
+    # field auto generated - return a single property by ID
+    property(id: 3232) { name id }
+}
+```
+
+You can easily extend the generated schema (or start one from scratch). Below is an example of replacing the generated `properties` field with one that allows a `name` argument.
+
+```c#
+var schema = SchemaBuilder.FromObject<MyContext>();
+// replace properties field with one that takes an optional name argument
+schema.ReplaceField("properties", new { name = (string)null }, (ctx, args) => ctx.Properties.WhereWhen(p => p.Name.ToLower().Contains(args.name.ToLower()), !string.IsNullOrEmpty(args.name)), "Return a list of properties optionally filtered by name");
+```
+
+You can change `ctx.Properties.WhereWhen(p => p.Name.ToLower().Contains(args.name), !string.IsNullOrEmpty(args.name))` to whatever logic you need to filter/search.
+
+Below is some more examples of customising fields.
+
 ```csharp
-// Build from object
-var schema = SchemaBuilder.FromObject<MyDbContext>();
+// New schema
+var schema = new SchemaProvider<MyDbContext>();
+// add custom typemappings, need to be done before we add types/fields that use them
+schema.AddScalarType<Point<double>>("Point", "Represents a point in 2D space (x,y)");
+schema.AddTypeMapping<NpgsqlPoint>("Point"); // when we see dotnet type NpgsqlPoint it will be a Point type in the schema
+schema.AddTypeMapping<NpgsqlPolygon>("[Point!]!"); // when we see dotnet type NpgsqlPolygon it will be a [Point!]! type in the schema
+
+// build the rest of the schema from our context. This is the same as SchemaBuilder.FromObject<MyContext>(); except now we have some type mappings set up
+schema.PopulateFromContext(
+    autoCreateIdArguments: true,
+    autoCreateEnumTypes: true
+);
+
 
 // Or create one from scratch (no default fields etc.)
 var schema = SchemaBuilder.Create<MyDbContext>();
@@ -209,12 +266,11 @@ var schema = SchemaBuilder.Create<MyDbContext>();
 // custom fields on existing type
 schema.Type<Person>().AddField("totalChildren", p => p.Children.Count(), "Number of children");
 
-// custom type
+// add a custom type
 schema.AddType<TBaseEntity>("name", "description");
-// e.g. add a new type based on Person filtered by an expression
-var type = schema.AddType<Person>("peopleOnMars", "All people on mars", person => person.Location.Name == "Mars");
-type.AddAllFields(); // add the C# properties
-// or select the fields
+// add all the public C# properties as fields
+type.AddAllFields();
+// or add only select fields
 type.AddField(p => p.Id, "The unique identifier");
 // Add fields with _required_ arguments - include `using static EntityGraphQL.Schema.ArgumentHelper;`
 schemaProvider.AddField("user", new {id = Required<int>()}, (ctx, param) => ctx.Users.FirstOrDefault(u => u.Id == param.id), "description");
@@ -228,11 +284,24 @@ var paramTypes = new { id = Required<Guid>() };
 var paramTypes = new { unit = "meter" };
 ```
 
+You can do the above with `ReplaceField()` to replace a field already defined in the schema (e.g. generated from `SchemaBuilder.FromObject<MyDbContext>()`).
+
 ## LINQ Helper Methods
 EntityGraphQL provides a few extension methods to help with building queries with optional parameters.
 
-- `Take(int?)` - Only apply the `Take()` method if the argument has a value. Usage: `schema.AddField("Field", new { limit = (int?)null }, (db, p) => db.Entity.Take(p.limit), "description")`
-- `WhereWhen(predicate, when)` - Only apply the `Where()` method is `when` is true. Usage: `schema.AddField("Field", new { search = (string)null }, (db, p) => db.Entity.WhereWhen(s => s.Name.ToLower().Contains(p.search.ToLower()), !string.IsNullOrEmpty(p.search)), "Description")`
+### `Take(int?)`
+Only apply the `Take()` method if the argument has a value.
+
+```c#
+schema.AddField("Field", new { limit = (int?)null }, (db, p) => db.Entity.Take(p.limit), "description");
+```
+### `WhereWhen(predicate, when)`
+
+Only apply the `Where()` method if `when` is `true`.
+
+```c#
+schema.AddField("Field", new { search = (string)null }, (db, p) => db.Entity.WhereWhen(s => s.Name.ToLower().Contains(p.search.ToLower()), !string.IsNullOrEmpty(p.search)), "Description");
+```
 
 # Mutations
 Mutations allow you to make changes to data while selecting some data to return from the result. See the [GraphQL documentation](https://graphql.org/learn/queries/#mutations) for more information on the syntax.
@@ -246,7 +315,7 @@ I.e if you have a mutation adds an actor to a movie entity and you want to retur
 ```csharp
 public class MovieMutations
 {
-  [GraphQLMutation]
+  [GraphQLMutation("Add a new actor")]
   public Movie AddActor(MyDbContext db, ActorArgs args)
   {
     // do your magic here. e.g. with EF or other business logic
@@ -258,10 +327,11 @@ public class MovieMutations
   }
 }
 
-public class PropertyArgs
+[MutationArguments]
+public class ActorArgs
 {
   public string Name { get; set; }
-  public Decimal Cost { get; set; }
+  public int Age { get; set; }
 }
 ```
 
@@ -294,14 +364,15 @@ schemaProvider.AddMutationFrom(new MovieMutations());
 ```
 
 - All `public` methods marked with the `[GraphQLMutation]` attribute will be added to the schema
-- Parameters for the method should be
-  - First - the base context that your schema is built from
-  - Second - a class that defines each available parameter (and type)
-  - Third...n - Optionally any dependencies you want injected
-- Variables from the GraphQL request are mapped into the args (last) parameter
+- Parameters for the mutation method _can_ be
+  - the base context that your schema is built from - the instance passed in will be the same one passed into `schema.ExecuteQuery()`
+  - a class that defines each available mutation argument (and type - `ActorArgs` in the above example). This must be marked with the `MutationArgumentsAttribute`
+  - Any dependencies you want that have been registered in the `IServiceProvider` passed into `schema.ExecuteQuery()`
+- Variables from the GraphQL request are mapped into the `MutationArgumentsAttribute` parameter
 
-You can now request a mutation
-```
+You can now run a mutation
+
+```gql
 mutation AddActor($name: String!, $movieId: int!) {
   addMovie(name: $name, id: $movieId) {
     id name
@@ -317,6 +388,50 @@ With variables
   "movieId": 2
 }
 ```
+
+## Validation
+You can use the `System.ComponentModel.DataAnnotations.Required` attribute to add validaiton to your mutation arguments. Example
+
+```c#
+public class ActorArgs
+{
+  [Required(AllowEmptyStrings = false, ErrorMessage = "Actor Name is required")]
+  public string Name { get; set; }
+  public int Age { get; set; }
+}
+```
+
+If you do not supply a non empty string as the `name` argument for the mutation you'll get an error message.
+
+If your model validation fails from a `RequiredAttribute` you mutation method _will not be called_.
+
+You can also add multiple error messages instead of throwing an exception on the first error using the `GraphQLValidator` service.
+
+```csharp
+public class MovieMutations
+{
+  [GraphQLMutation]
+  public Expression<Func<MyDbContext, Movie>> AddActor(MyDbContext db, ActorArgs args, GraphQLValidator validator)
+  {
+    if (string.IsNullOrEmpty(args.Name))
+      validator.AddError("Name argument is required");
+    if (args.age <= 0)
+      validator.AddError("Age argument must be positive");
+
+    if (validator.HasErrors)
+      return null;
+
+    // do your magic here. e.g. with EF or other business logic
+    var movie = db.Movies.First(m => m.Id == args.Id);
+    var actor = new Person { Name = args.Name, ... };
+    movie.Actors.Add(actor);
+    db.SaveChanges();
+    return ctx => ctx.Movies.First(m => m.Id == movie.Id);
+  }
+}
+```
+
+Of course if you opt to throw an exception it will be caught and included in the error results.
 
 # Accessing other services in your mutation or field selections
 EntityGraphQL uses a `IServiceProvider` that you provide to resolve any services you require outside of the `TContext`. You provide an instance of the `IServiceProvider` when you call `ExecuteQuery()`.
@@ -369,11 +484,18 @@ public class MovieMutations
 
 We can also inject services in field selections with the helper `WithService<T>()`
 
+_Note as `WithService` has a typed return `WithService<TService, Treturn>` you can let the compiler figure out the return type by typing the arguments. e.g.
+
 ```c#
-schema.AddField("Field", new { search = (string)null }, (db, p) => WithService<IMyService>(mySer => mySer.ReturnNonDbData(p.search), "Description")
+WithService((IMyService mySer) => mySer.Something())
+// vs
+WithService<IMyService, Int>(mySer => mySer.Something())
+
+```c#
+schema.AddField("Field", new { search = (string)null }, (db, p) => WithService((IMyService mySer) => mySer.ReturnNonDbData(p.search), "Description")
 
 // or a field on a typoe
-schema.Type<Movie>().AddField("Field", new { search = (string)null }, (movie, p) => WithService<IMyService>(mySer => mySer.ReturnNonDbData(p.search, movie.Id), "Description")
+schema.Type<Movie>().AddField("Field", new { search = (string)null }, (movie, p) => WithService((IMyService mySer) => mySer.ReturnNonDbData(p.search, movie.Id), "Description")
 ```
 
 Using the wrapper inside the field selection expression lets us still use the anonymous type for the parameter definition.
@@ -496,19 +618,6 @@ var eql = @"if location.name = ""Mars"" then (cost + 5) * type.premium else (cos
 var compiledResult = EqlCompiler.Compile(eql, schemaProvider);
 var theRealPrice = compiledResult.Execute<decimal>(myPropertyInstance);
 ```
-
-## Supported LINQ methods (non-GraphQL compatible)
-**On top of** GraphQL syntax, any list/array supports some of the standard .NET LINQ methods.
-- `array.where(filter)`
-- `array.filter(filter)`
-- `array.first(filter?)`
-- `array.last(filter?)`
-- `array.count(filter?)`
-  - `filter` is an expression that can be `true` or `false`, written from the context of the array item
-- `array.take(int)`
-- `array.skip(int)`
-- `array.orderBy(field)`
-- `array.orderByDesc(field)`
 
 # Contribute
 Please do. Pull requests are very welcome. See the open issues for bugs or features that would be useful

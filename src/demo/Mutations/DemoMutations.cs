@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Expressions;
 using EntityGraphQL;
@@ -9,8 +10,20 @@ namespace demo.Mutations
 {
     public class DemoMutations
     {
-        public DemoMutations()
+        [GraphQLMutation("Example of a mutation that takes 0 arguments")]
+        public Expression<Func<DemoContext, Movie>> ExampleNoArgs(DemoContext db)
         {
+            // do something smart here with db
+
+            return ctx => ctx.Movies.First();
+        }
+
+        [GraphQLMutation("Example of a mutation that does not use the context or argments but does use registered services")]
+        public int ExampleNoArgsWithService(AgeService ageService)
+        {
+            // we returning a scalar, you do not require the Expression<>
+            // AgeService registered in DI. Use it here
+            return ageService.Calc(new Person());
         }
 
         /// <summary>
@@ -42,15 +55,27 @@ namespace demo.Mutations
         }
 
         [GraphQLMutation]
-        public Expression<Func<DemoContext, Person>> AddActor(DemoContext db, AddActorArgs args)
+        public Expression<Func<DemoContext, Person>> AddActor(DemoContext db, [MutationArguments] AddActorArgs args, GraphQLValidator validator)
         {
-            var person = new Person {
+            if (string.IsNullOrEmpty(args.FirstName))
+                validator.AddError("Name argument is required");
+            if (db.Movies.FirstOrDefault(m => m.Id == args.MovieId) == null)
+                validator.AddError("MovieId not found");
+            // ... do more validation
+
+            if (validator.HasErrors)
+                return null;
+
+            //  we're here and valid
+            var person = new Person
+            {
                 Id = (uint)new Random().Next(),
                 FirstName = args.FirstName,
                 LastName = args.LastName,
             };
             db.People.Add(person);
-            var actor = new Actor {
+            var actor = new Actor
+            {
                 MovieId = args.MovieId,
                 Person = person,
             };
@@ -67,15 +92,17 @@ namespace demo.Mutations
         /// <param name="args"></param>
         /// <returns></returns>
         [GraphQLMutation]
-        public Expression<Func<DemoContext, IEnumerable<Person>>> AddActor2(DemoContext db, AddActorArgs args)
+        public Expression<Func<DemoContext, IEnumerable<Person>>> AddActor2(DemoContext db, [MutationArguments] AddActorArgs args)
         {
-            var person = new Person {
+            var person = new Person
+            {
                 Id = (uint)new Random().Next(),
                 FirstName = args.FirstName,
                 LastName = args.LastName,
             };
             db.People.Add(person);
-            var actor = new Actor {
+            var actor = new Actor
+            {
                 MovieId = args.MovieId,
                 Person = person,
             };
@@ -89,9 +116,11 @@ namespace demo.Mutations
     /// <summary>
     /// Must be a public class. Public fields and Properties are the mutation's arguments
     /// </summary>
+    [MutationArguments]
     public class AddMovieArgs
     {
         public Genre Genre;
+        [Required(AllowEmptyStrings = false, ErrorMessage = "Movie Name is required")]
         public string Name { get; set; }
         public double Rating { get; set; }
         public DateTime Released;

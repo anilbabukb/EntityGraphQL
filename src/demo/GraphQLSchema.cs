@@ -14,21 +14,22 @@ namespace demo
             // build our schema directly from the DB Context
             var demoSchema = SchemaBuilder.FromObject<DemoContext>();
 
-            demoSchema.AddCustomScalarType(typeof(DateTime), "Date");
-            demoSchema.AddCustomScalarType(typeof(DateTime?), "Date");
-
             // we can extend the schema
 
             // Add custom root fields
-            demoSchema.ReplaceField("actors", new {
+            demoSchema.ReplaceField("actors", new
+            {
                 filter = ArgumentHelper.EntityQuery<Person>()
             }, (db, param) => db.People.Where(p => p.ActorIn.Any()).WhereWhen(param.filter, param.filter.HasValue), "List of actors");
             demoSchema.AddField("writers", db => db.People.Where(p => p.WriterOf.Any()), "List of writers");
             demoSchema.AddField("directors", db => db.People.Where(p => p.DirectorOf.Any()), "List of directors");
 
             // Add calculated fields to a type
-            demoSchema.Type<Person>().AddField("age", l => (int)((DateTime.Now - l.Dob).TotalDays / 365), "Show the person's age");
             demoSchema.Type<Person>().AddField("name", l => $"{l.FirstName} {l.LastName}", "Person's name");
+            // really poor example of using services e.g. you should just do below but pretend the service does something crazy like calls an API
+            // demoSchema.Type<Person>().AddField("age", l => (int)((DateTime.Now - l.Dob).TotalDays / 365), "Show the person's age");
+            // AgeService needs to be added to the ServiceProvider
+            demoSchema.Type<Person>().AddField("age", person => ArgumentHelper.WithService((AgeService ageService) => ageService.Calc(person)), "Show the person's age");
 
             // replace fields. e.g. remove a many-to-many relationships
             demoSchema.Type<Movie>().ReplaceField("actors", m => m.Actors.Select(a => a.Person), "Actors in the movie");
@@ -49,8 +50,8 @@ namespace demo
                 "PersonPagination");
 
             // add some mutations (always last, or after the types they require have been added)
-            demoSchema.AddMutationFrom(new DemoMutations());
             demoSchema.AddInputType<Detail>("Detail", "Detail item").AddAllFields();
+            demoSchema.AddMutationFrom(new DemoMutations());
             File.WriteAllText("schema.graphql", demoSchema.GetGraphQLSchema());
             return demoSchema;
         }
@@ -85,12 +86,15 @@ namespace demo
 
     public class PersonPagination : Pagination
     {
+        [GraphQLNotNull]
         public IQueryable<Person> People { get; set; }
     }
 
     public class Pagination
     {
+        [GraphQLNotNull]
         public int Total { get; set; }
+        [GraphQLNotNull]
 
         public int PageCount { get; set; }
     }

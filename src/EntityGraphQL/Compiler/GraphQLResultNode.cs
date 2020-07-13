@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Threading.Tasks;
 
 namespace EntityGraphQL.Compiler
 {
@@ -24,18 +26,28 @@ namespace EntityGraphQL.Compiler
     public class GraphQLResultNode : IGraphQLBaseNode
     {
         /// <summary>
-        /// A list of graphql operations. THese could be mutations or queries
+        /// A list of graphql operations. These could be mutations or queries
         /// </summary>
         /// <value></value>
-        public List<IGraphQLNode> Operations { get; }
-        public OperationType Type => OperationType.Result;
+        public List<GraphQLQueryNode> Operations { get; }
 
-        public GraphQLResultNode(IEnumerable<IGraphQLNode> operations)
+        public GraphQLResultNode()
         {
-            this.Operations = operations.ToList();
+            this.Operations = new List<GraphQLQueryNode>();
         }
 
-        public string Name => "Query Request Root";
+        public string Name
+        {
+            get => "Query Request Root";
+            set => throw new NotImplementedException();
+        }
+
+        public IReadOnlyDictionary<ParameterExpression, object> ConstantParameters => throw new NotImplementedException();
+
+        public QueryResult ExecuteQuery<TContext>(TContext context, IServiceProvider services, string operationName = null)
+        {
+            return ExecuteQueryAsync(context, services, operationName).Result;
+        }
 
         /// <summary>
         /// Executes the compiled GraphQL document adding data results into QueryResult.
@@ -45,9 +57,10 @@ namespace EntityGraphQL.Compiler
         /// <param name="services">Service provider used for DI</param>
         /// <param name="operationName">Optional operation name</param>
         /// <returns></returns>
-        public QueryResult ExecuteQuery<TContext>(TContext context, IServiceProvider services, string operationName = null)
+        public async Task<QueryResult> ExecuteQueryAsync<TContext>(TContext context, IServiceProvider services, string operationName = null)
         {
             var result = new QueryResult();
+            var validator = new GraphQLValidator();
             var op = string.IsNullOrEmpty(operationName) ? Operations.First() : Operations.First(o => o.Name == operationName);
             // execute all root level nodes in the op
             // e.g. op = query Op1 {
@@ -55,15 +68,33 @@ namespace EntityGraphQL.Compiler
             //      movies { released name }
             // }
             // people & movies will be the 2 fields that will be executed
-            foreach (var node in op.Fields)
+            foreach (var node in op.QueryFields)
             {
                 result.Data[node.Name] = null;
                 // request.Variables are already compiled into the expression
-                var data = node.Execute(context, services);
+                var data = await ((GraphQLExecutableNode)node).ExecuteAsync(context, validator, services);
                 result.Data[node.Name] = data;
             }
 
+            if (validator.Errors.Count > 0)
+                result.Errors.AddRange(validator.Errors);
+
             return result;
+        }
+
+        public ExpressionResult GetNodeExpression()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SetNodeExpression(ExpressionResult expressionResult)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SetCombineExpression(Expression item2)
+        {
+            throw new NotImplementedException();
         }
     }
 }

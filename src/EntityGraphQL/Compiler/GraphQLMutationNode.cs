@@ -3,39 +3,45 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading.Tasks;
 using EntityGraphQL.Compiler.Util;
 using EntityGraphQL.Extensions;
+using EntityGraphQL.Schema;
 
 namespace EntityGraphQL.Compiler
 {
-    public class GraphQLMutationNode : IGraphQLNode
+    public class GraphQLMutationNode : GraphQLExecutableNode, IGraphQLBaseNode
     {
-        private readonly CompiledQueryResult result;
-        private readonly IGraphQLNode graphQLNode;
+        private readonly MutationType mutationType;
+        private readonly Dictionary<string, ExpressionResult> args;
+        private readonly GraphQLQueryNode resultSelection;
 
-        public IEnumerable<IGraphQLNode> Fields { get; private set; }
+        public string Name { get => mutationType.Name; set => throw new NotImplementedException(); }
 
-        public string Name => graphQLNode.Name;
-        public OperationType Type => OperationType.Mutation;
+        public IReadOnlyDictionary<ParameterExpression, object> ConstantParameters => resultSelection?.ConstantParameters ?? new Dictionary<ParameterExpression, object>();
 
-        public IReadOnlyDictionary<ParameterExpression, object> ConstantParameters => new Dictionary<ParameterExpression, object>();
-
-        public List<ParameterExpression> Parameters => throw new NotImplementedException();
-
-        public GraphQLMutationNode(CompiledQueryResult result, IGraphQLNode graphQLNode)
+        public GraphQLMutationNode(MutationType mutationType, Dictionary<string, ExpressionResult> args, GraphQLQueryNode resultSelection)
         {
-            this.result = result;
-            this.graphQLNode = graphQLNode;
-            Fields = new List<IGraphQLNode>();
+            this.mutationType = mutationType;
+            this.args = args;
+            this.resultSelection = resultSelection;
         }
 
         public ExpressionResult GetNodeExpression()
         {
             throw new NotImplementedException();
         }
-        public void SetNodeExpression(ExpressionResult expr)
+
+        private async Task<object> ExecuteMutationAsync<TContext>(TContext context, GraphQLValidator validator, IServiceProvider serviceProvider)
         {
-            throw new NotImplementedException();
+            try
+            {
+                return await mutationType.CallAsync(context, args, validator, serviceProvider);
+            }
+            catch (EntityQuerySchemaException e)
+            {
+                throw new EntityQuerySchemaException($"Error applying mutation: {e.Message}");
+            }
         }
 
         /// <summary>
@@ -45,18 +51,19 @@ namespace EntityGraphQL.Compiler
         /// <param name="serviceProvider">A service provider to look up any dependencies</param>
         /// <typeparam name="TContext"></typeparam>
         /// <returns></returns>
-        public object Execute<TContext>(TContext context, IServiceProvider serviceProvider)
+        public override async Task<object> ExecuteAsync<TContext>(TContext context, GraphQLValidator validator, IServiceProvider serviceProvider)
         {
             // run the mutation to get the context for the query select
-            var mutation = (MutationResult)this.result.ExpressionResult;
-            var result = mutation.Execute(context, serviceProvider);
+            var result = await ExecuteMutationAsync(context, validator, serviceProvider);
+            if (result == null)
+                return null;
             if (typeof(LambdaExpression).IsAssignableFrom(result.GetType()))
             {
                 var mutationLambda = (LambdaExpression)result;
                 var mutationContextParam = mutationLambda.Parameters.First();
                 var mutationExpression = mutationLambda.Body;
 
-                // this willtypically be similar to
+                // this will typically be similar to
                 // db => db.Entity.Where(filter) or db => db.Entity.First(filter)
                 // i.e. they'll be returning a list of items or a specific item
                 // We want to take the field selection from the GraphQL query and add a LINQ Select() onto the expression
@@ -65,7 +72,7 @@ namespace EntityGraphQL.Compiler
                 // E.g  we want db => db.Entity.Select(e => new {name = e.Name, ...}).First(filter)
                 // we dot not want db => new {name = db.Entity.First(filter).Name, ...})
 
-                var selectParam = graphQLNode.Parameters.First();
+                var selectParam = resultSelection.FieldParameter;
 
                 if (!mutationLambda.ReturnType.IsEnumerableOrArray())
                 {
@@ -77,19 +84,20 @@ namespace EntityGraphQL.Compiler
                             var baseExp = call.Arguments.First();
                             if (call.Arguments.Count == 2)
                             {
+                                // this is a ctx.Something.First(f => ...)
                                 // move the fitler to a Where call
                                 var filter = call.Arguments.ElementAt(1);
-                                baseExp = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Where", new Type[] { selectParam.Type }, baseExp, filter);
+                                baseExp = ExpressionUtil.MakeCallOnQueryable("Where", new Type[] { selectParam.Type }, baseExp, filter);
                             }
 
                             // build select
-                            var selectExp = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Select", new Type[] { selectParam.Type, graphQLNode.GetNodeExpression().Type }, baseExp, Expression.Lambda(graphQLNode.GetNodeExpression(), selectParam));
+                            var selectExp = ExpressionUtil.MakeCallOnQueryable("Select", new Type[] { selectParam.Type, resultSelection.GetNodeExpression().Type }, baseExp, Expression.Lambda(resultSelection.GetNodeExpression(), selectParam));
 
                             // add First/Last back
-                            var firstExp = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, call.Method.Name, new Type[] { selectExp.Type.GetGenericArguments()[0] }, selectExp);
+                            var firstExp = ExpressionUtil.MakeCallOnQueryable(call.Method.Name, new Type[] { selectExp.Type.GetGenericArguments()[0] }, selectExp);
 
                             // we're done
-                            graphQLNode.SetNodeExpression(firstExp);
+                            resultSelection.SetNodeExpression(firstExp);
                         }
                     }
                     else
@@ -100,33 +108,47 @@ namespace EntityGraphQL.Compiler
                             var me = (MemberExpression)mutationLambda.Body;
                             if (me.Expression.NodeType == ExpressionType.Constant)
                             {
-                                graphQLNode.AddConstantParameter(Expression.Parameter(me.Type), Expression.Lambda(me).Compile().DynamicInvoke());
+                                resultSelection.AddConstantParameter(Expression.Parameter(me.Type, $"const_{me.Type.Name}"), Expression.Lambda(me).Compile().DynamicInvoke());
                             }
                         }
                         else if (mutationLambda.Body.NodeType == ExpressionType.Constant)
                         {
                             var ce = (ConstantExpression)mutationLambda.Body;
-                            graphQLNode.AddConstantParameter(Expression.Parameter(ce.Type), ce.Value);
+                            resultSelection.AddConstantParameter(Expression.Parameter(ce.Type, $"const_{ce.Type.Name}"), ce.Value);
                         }
                     }
                 }
                 else
                 {
-                    var exp = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Select", new Type[] { selectParam.Type, graphQLNode.GetNodeExpression().Type }, mutationExpression, Expression.Lambda(graphQLNode.GetNodeExpression(), selectParam));
-                    graphQLNode.SetNodeExpression(exp);
+                    var exp = ExpressionUtil.MakeCallOnQueryable("Select", new Type[] { selectParam.Type, resultSelection.GetNodeExpression().Type }, mutationExpression, Expression.Lambda(resultSelection.GetNodeExpression(), selectParam));
+                    resultSelection.SetNodeExpression(exp);
                 }
 
                 // make sure we use the right parameter
-                graphQLNode.Parameters[0] = mutationContextParam;
-                result = graphQLNode.Execute(context, serviceProvider);
+                resultSelection.FieldParameter = mutationContextParam;
+                result = await resultSelection.ExecuteAsync(context, validator, serviceProvider);
                 return result;
             }
+
+            if (resultSelection == null) // mutation must return a scalar type
+                return result;
+
             // run the query select
-            result = graphQLNode.Execute(result, serviceProvider);
+            result = await resultSelection.ExecuteAsync(result, validator, serviceProvider);
             return result;
         }
 
         public void AddConstantParameter(ParameterExpression param, object val)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SetNodeExpression(ExpressionResult expressionResult)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SetCombineExpression(Expression item2)
         {
             throw new NotImplementedException();
         }

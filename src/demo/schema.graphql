@@ -5,8 +5,8 @@ schema {
 
 scalar Int
 scalar Float
-scalar String
 scalar Boolean
+scalar String
 scalar ID
 scalar Date
 
@@ -55,7 +55,7 @@ type Movie {
 	name: String
 	"Enum of Genre"
 	genre: Genre!
-	released: Date
+	released: Date!
 	"Actors in the movie"
 	actors: [Person!]
 	"Writers in the movie"
@@ -84,10 +84,10 @@ type Person {
 	directorOf: [Movie!]
 	died: Date
 	isDeleted: Boolean!
-	"Show the person's age"
-	age: Int!
 	"Person's name"
 	name: String
+	"Show the person's age"
+	age: Int!
 }
 
 type Writer {
@@ -104,7 +104,7 @@ type PersonPagination {
 	"total pages based on page size"
 	pageCount: Int!
 	"collection of people"
-	people: [Person!]
+	people: [Person!]!
 }
 
 "Detail item"
@@ -113,6 +113,10 @@ input Detail {
 }
 
 type Mutation {
+	"Example of a mutation that takes 0 arguments"
+	exampleNoArgs: Movie
+	"Example of a mutation that does not use the context or argments but does use registered services"
+	exampleNoArgsWithService: Int!
 	"Add a new Movie object"
 	addMovie(name: String, rating: Float, details: [Detail!], genre: Genre!, released: Date): Movie
 	addActor(firstName: String, lastName: String, movieId: Int): Person
