@@ -88,19 +88,6 @@ graphQL: gqlFragment* (dataQuery | mutationQuery | subscriptionQuery) (
 args: expression (',' ws* expression)*;
 call: method = identity '(' arguments = args? ')';
 callPath: (identity | call) ('.' (identity | call))*;
-operator: '-'
-	| '+'
-	| '%'
-	| '^'
-	| 'and'
-	| '*'
-	| 'or'
-	| '='
-	| '<='
-	| '>='
-	| '<'
-	| '>'
-	| '/';
 
 expression:
 	'if ' (' ' | '\t')* test = expression (' ' | '\t')* 'then ' (' ' | '\t')* ifTrue = expression (' ' | '\t')* 'else ' (' ' | '\t')* ifFalse = expression # ifThenElse
