@@ -20,7 +20,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesOrderBy()
         {
-            var exp = EqlCompiler.Compile(@"people.orderBy(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.orderBy(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Equal(4, result.Count());
             Assert.Equal("Bob", result.ElementAt(0).Name);
@@ -32,7 +32,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesOrderByDesc()
         {
-            var exp = EqlCompiler.Compile(@"people.orderByDesc(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.orderByDesc(name)", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Equal(4, result.Count());
             Assert.Equal("Robin", result.ElementAt(0).Name);
@@ -61,7 +61,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesWhereForStringStartsWith()
         {
-            var exp = EqlCompiler.Compile(@"people.where(name.startsWith(""L""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.where(name.startsWith(""L""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Single(result);
             Assert.Equal("Luke", result.ElementAt(0).Name);
@@ -70,7 +70,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesWhereForStringEndsWith()
         {
-            var exp = EqlCompiler.Compile(@"people.where(name.endsWith(""n""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.where(name.endsWith(""n""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Single(result);
             Assert.Equal("Robin", result.ElementAt(0).Name);
@@ -79,7 +79,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesWhereForStringContains()
         {
-            var exp = EqlCompiler.Compile(@"people.where(name.contains(""b""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.where(name.contains(""b""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Equal(3, result.Count());
             Assert.Equal("Bob", result.ElementAt(0).Name);
@@ -90,7 +90,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesWhereForStringNotContains()
         {
-            var exp = EqlCompiler.Compile(@"people.where(name.notContains(""b""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.where(name.notContains(""b""))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Single(result);
             Assert.Equal("Luke", result.ElementAt(0).Name);
@@ -99,7 +99,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesWhereForNot()
         {
-            var exp = EqlCompiler.Compile(@"people.where(not(name.contains(""b"")))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
+            var exp = EntityQueryCompiler.Compile(@"people.where(not(name.contains(""b"")))", SchemaBuilder.FromObject<TestSchema>(), null, new DefaultMethodProvider(), null);
             var result = exp.Execute(new TestSchema()) as IEnumerable<Person>;
             Assert.Single(result);
             Assert.Equal("Luke", result.ElementAt(0).Name);

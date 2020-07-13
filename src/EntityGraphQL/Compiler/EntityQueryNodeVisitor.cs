@@ -7,6 +7,7 @@ using EntityGraphQL.Extensions;
 using EntityGraphQL.Schema;
 using EntityGraphQL.LinqQuery;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace EntityGraphQL.Compiler
 {
@@ -17,8 +18,7 @@ namespace EntityGraphQL.Compiler
         private ExpressionResult currentContext;
         private readonly ISchemaProvider schemaProvider;
         private readonly IMethodProvider methodProvider;
-        private readonly QueryVariables variables;
-        private IMethodType fieldArgumentContext;
+        
         private readonly Regex guidRegex = new Regex(@"^[0-9A-F]{8}[-]?([0-9A-F]{4}[-]?){3}[0-9A-F]{12}$", RegexOptions.IgnoreCase);        
         private readonly ConstantVisitor constantVisitor;
 

@@ -91,77 +91,77 @@ namespace EntityGraphQL.LinqQuery.Tests
         [Fact]
         public void CompilesBinaryExpressionEqualsAgainstString()
         {
-            var exp = EqlCompiler.Compile("someRelation.name = \"bob\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.name = \"bob\"", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionNotEquals()
         {
-            var exp = EqlCompiler.Compile("someRelation.relation.id != 100", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.relation.id != 100", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionNotEqualsAgainstString()
         {
-            var exp = EqlCompiler.Compile("someRelation.name != \"tim\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.name != \"tim\"", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionGreaterThan()
         {
-            var exp = EqlCompiler.Compile("someRelation.relation.id > 98", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.relation.id > 98", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionGreaterThanAgainstString()
         {
-            var exp = EqlCompiler.Compile("someRelation.name > \"b\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.name > \"b\"", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionGreaterThanOrEqualTo()
         {
-            var exp = EqlCompiler.Compile("someRelation.relation.id >= 98", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.relation.id >= 98", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionGreaterThanOrEqualToAgainstString()
         {
-            var exp = EqlCompiler.Compile("someRelation.name >= \"b\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.name >= \"b\"", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionLessThan()
         {
-            var exp = EqlCompiler.Compile("someRelation.relation.id < 100", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.relation.id < 100", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionLessThanAgainstString()
         {
-            var exp = EqlCompiler.Compile("someRelation.name < \"c\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.name < \"c\"", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionLessThanOrEqualTo()
         {
-            var exp = EqlCompiler.Compile("someRelation.relation.id <= 100", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.relation.id <= 100", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
         [Fact]
         public void CompilesBinaryExpressionLessThanOrEqualToAgainstString()
         {
-            var exp = EqlCompiler.Compile("someRelation.name <= \"c\"", SchemaBuilder.FromObject<TestSchema>(), null);
+            var exp = EntityQueryCompiler.Compile("someRelation.name <= \"c\"", SchemaBuilder.FromObject<TestSchema>(), null);
             Assert.True((bool)exp.Execute(new TestSchema()));
         }
 
@@ -272,7 +272,7 @@ namespace EntityGraphQL.LinqQuery.Tests
         public void TestLinqQueryWorksForAnd()
         {
             var schemaProvider = SchemaBuilder.FromObject<TestEntity>();
-            var compiledResult = EqlCompiler.Compile("(relation.id = 1) and (name = \"bob\")", schemaProvider, null);
+            var compiledResult = EntityQueryCompiler.Compile("(relation.id = 1) and (name = \"bob\")", schemaProvider, null);
             var list = new List<TestEntity> {
                 new TestEntity("bob") {
                     Relation = new Person {

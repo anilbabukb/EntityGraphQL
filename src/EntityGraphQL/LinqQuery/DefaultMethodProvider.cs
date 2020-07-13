@@ -124,13 +124,22 @@ namespace EntityGraphQL.LinqQuery
             return MakeOptionalFilterArgumentCall(context, argContext, methodName, args, "Distinct");
         }
 
+        //private static ExpressionResult MakeTakeMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
+        //{
+        //    ExpectArgsCount(1, args, methodName);
+        //    var amount = args.First();
+        //    amount = ConvertTypeIfWeCan(methodName, amount, typeof(int));
+        //    var result = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Take", new Type[] { argContext.Type }, context, amount);
+        //    return result;
+        //}
+
         private static ExpressionResult MakeTakeMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)
         {
             ExpectArgsCount(1, args, methodName);
             var amount = args.First();
             amount = ConvertTypeIfWeCan(methodName, amount, typeof(int));
-            var result = ExpressionUtil.MakeExpressionCall(new[] { typeof(Queryable), typeof(Enumerable) }, "Take", new Type[] { argContext.Type }, context, amount);
-            return result;
+
+            return ExpressionUtil.MakeCallOnQueryable("Take", new Type[] { argContext.Type }, context, amount);
         }
 
         private static ExpressionResult MakeSkipMethod(Expression context, Expression argContext, string methodName, ExpressionResult[] args)

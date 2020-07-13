@@ -8,6 +8,8 @@ using EntityGraphQL.LinqQuery;
 using EntityGraphQL.Compiler.Util;
 using System.Security.Claims;
 using System.Reflection;
+using EntityGraphQL.Compiler;
+using System;
 
 namespace EntityGraphQL.Compiler
 {
@@ -109,22 +111,26 @@ namespace EntityGraphQL.Compiler
             var result = processor.ProcessQueryInternal(fieldResult, argObj);
             return result;
         }
-
-                IGraphQLNode graphQLNode = null;
-                if (exp.Type.IsEnumerableOrArray())
-                {    
-                    var listExp = Compiler.Util.ExpressionUtil.FindDistinct(result.ExpressionResult);
-                    if (listExp.Item1 != null)
-                    {
-                        var item1 = (ExpressionResult)listExp.Item1;
-                        item1.AddConstantParameters(result.ExpressionResult.ConstantParameters);
-                        graphQLNode = BuildDynamicSelectOnCollection(new CompiledQueryResult(item1, result.ContextParams), name, context);
-                        graphQLNode.SetNodeExpression((ExpressionResult)Compiler.Util.ExpressionUtil.CombineExpressions(graphQLNode.GetNodeExpression(), listExp.Item2));
-                    }
-                    else
-                    {
-                        graphQLNode = BuildDynamicSelectOnCollection(result, name, context);
-                    }
+        public IGraphQLBaseNode ParseFieldSelect(ExpressionResult expContext, string name, EntityGraphQLParser.ObjectSelectionContext context)
+        {
+            try
+            {
+                IGraphQLBaseNode graphQLNode = null;
+                if (expContext.Type.IsEnumerableOrArray())
+                {
+                    //var listExp = Compiler.Util.ExpressionUtil.FindDistinct(result.ExpressionResult);
+                    //if (listExp.Item1 != null)
+                    //{
+                    //    var item1 = (ExpressionResult)listExp.Item1;
+                    //    item1.AddConstantParameters(result.ExpressionResult.ConstantParameters);
+                    //    graphQLNode = BuildDynamicSelectOnCollection(new CompiledQueryResult(item1, result.ContextParams), name, context);
+                    //    graphQLNode.SetNodeExpression((ExpressionResult)Compiler.Util.ExpressionUtil.CombineExpressions(graphQLNode.GetNodeExpression(), listExp.Item2));
+                    //}
+                    //else
+                    //{
+                    //    graphQLNode = BuildDynamicSelectOnCollection(result, name, context);
+                    //}
+                    graphQLNode = BuildDynamicSelectOnCollection(expContext, name, context);
                 }
                 else
                 {
