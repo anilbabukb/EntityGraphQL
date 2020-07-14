@@ -147,13 +147,14 @@ namespace EntityGraphQL.Compiler
 
         public override ExpressionResult VisitConstant(EntityGraphQLParser.ConstantContext context)
         {
-            // we may need to convert a string into a DateTime or Guid type
-            string value = context.GetText().Substring(1, context.GetText().Length - 2).Replace("\\\"", "\"");
-            if (guidRegex.IsMatch(value))
-                return (ExpressionResult)Expression.Constant(Guid.Parse(value));
-            if (IsValidDate(value))
-                return (ExpressionResult)Expression.Constant(DateTime.Parse(value));
-            return (ExpressionResult)Expression.Constant(value);
+            //// we may need to convert a string into a DateTime or Guid type
+            //string value = context.GetText().Substring(1, context.GetText().Length - 2).Replace("\\\"", "\"");
+            //if (guidRegex.IsMatch(value))
+            //    return (ExpressionResult)Expression.Constant(Guid.Parse(value));
+            //if (IsValidDate(value))
+            //    return (ExpressionResult)Expression.Constant(DateTime.Parse(value));
+            //return (ExpressionResult)Expression.Constant(value);
+            return constantVisitor.VisitConstant(context);
         }
 
         bool IsValidDate(string text)
